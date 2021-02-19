@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="root">
+
+        <input type="text" v-model="email">
+        <span a="as" title="as" v-text="text">as</span>
+        <p>{{num}}</p>
+        {{num}}
+        <p v-html="html"></p>
+        你大爷{}{}{{}}
+        <div>
+            {{email}}
+        </div>
+        <div>
+            <p>{{text}}</p>
+        </div>
+    </div>
+    <div id="test">asd</div>
+
+    <script>
+        var testA = { a: 1, b: 2 }
+        /**
+         *  vue mvvm模式  view model viewmodel
+         * viewmodel作为中间层起到v变化通知m（绑定事件）m变化通知v（Object.defineProperty() 数据劫持）
+         * 那现在搞明白这两样东西 试着写一下
+         * */
+
+        function Observer(data) {
+            if (!data || typeof data !== 'object') {
+                return;
+            }
+
+            for (var key in data) {
+                defineReactive(data, key, data[key])
+            }
+        }
+
+        function defineReactive(data, key, value) {
+            let dep = new Dep()
+            Object.defineProperty(data, key, {
+                get: function () {
+                    Dep.target && dep.add(Dep.target)
+                    return value
+                },
+                set: function (newValue) {
+                    if (newValue === value) {
+                        return
+                    }
+                    value = newValue
+                    dep.notify()
+                },
+                enumerable: true,
+                configurable: false
+            })
+        }
+
+
+
+        /**
+         *  现在实现了数据劫持监听、修改，现在如何修改某一属性，所有用到其属性值的地方都为修改值？
+         *  1. 利用Object.defineProperty() 数据劫持，get收集依赖（用到的地方）
+         *  2. 创建Dep类，用于 保存收集的依赖，也就是订阅者，在修改时，发布订阅，通知订阅者已修改
+         *  3. 被劫持的属性对应一个数组，数组每一项就是订阅者
+         * */
+        function Dep() {
+            this.subs = []
+        }
+
+        Dep.prototype.add = function (item) {
+            this.subs.push(item)
+        }
+
+        Dep.prototype.notify = function () {
+            this.subs.forEach(item => item.update())
+        }
+
+        /**
+         * watcher 是中间的桥梁，observer和compiler没有联系，通过watcher，实现？
+         * 1. 通知view
+         *      Dep.target 静态属性，watch通过劫持get收集订阅者的方法，把自己放入 即
+         *          Dep.target = this;
+         *          this.value = vm[exp] // get收集依赖
+         *          dep.target = null
+         *
+         * 2. 通过回调
+         *
+         * */
+
+        function Watcher(data, key, callback) {
+            this.data = data
+            this.key = key
+            this.callback = callback
+            this.value = this.get(data, key)
+        }
+
+        Watcher.prototype.update = function () {
+            this.run()
+        }
+
+        Watcher.prototype.run = function () {
+            // 获取最新值
+            let newValue = this.get()
+            if (newValue === this.value) {
+                return
+            }
+            this.value = newValue
+            this.callback(this.value)
+
+        }
+
+        Watcher.prototype.get = function () {
+            Dep.target = this
+            let value = this.data[this.key]
+            Dep.target = null
+            return value
+        }
+
+
+        // -------------------compiler------------------------
+
+        function Compiler(el, vm) {
+            this.$vm = vm
+            this.$el = this.isElementNode(el) ? el : document.querySelector(el)
+            if (!this.$el) {
+                throw new Error('element is not defined')
+                return
+            }
+            // 转换文档碎片
+            this.fragment = this.node2Fragment()
+            // 编译模板查找指令和表达式并将其进行转换
+            this.init()
+            // 将编译好的文档碎片放入根元素中
+            this.$el.appendChild(this.fragment);
+
+        }
+
+        /**
+         *  创建fragment,将根元素内容全部放入
+         * */
+        Compiler.prototype.node2Fragment = function () {
+            let fragment = document.createDocumentFragment(), child;
+            while (child = this.$el.firstChild) {
+                fragment.appendChild(child)
+            }
+            return fragment
+        }
+
+
+
+        /**
+         *  初始化 
+         * */
+        Compiler.prototype.init = function (el) {
+            this.compilerElement()
+        }
+
+        /**
+         *  编译元素 
+         * */
+        Compiler.prototype.compilerElement = function (el) {
+            let childNodes = this.fragment.childNodes;
+            [].slice.call(childNodes).forEach((node) => {
+                console.log(node, 'node-----------')
+                console.log(node.textContent, 'pppppppppppp')
+                let reg = /\{\{(.*)\}\}/
+                // 元素
+                if (this.isElementNode(node)) {
+                    this.compiler(node)
+                } else if (this.isTextNode(node) && reg.test(node.textContent)) {
+                    // 文本
+                    this.compilerText(node, RegExp.$1.trim())
+                }
+
+                // if (node.childNodes && node.childNodes.length > 0) {
+                //     this.compilerElement(node)
+                // }
+            })
+        }
+
+        /**
+         *  编译元素 
+         * */
+        Compiler.prototype.compiler = function (node) {
+            let attributes = node.attributes, that = this;
+            // 循环该元素中的所有属性，查找是否有指令
+            [].slice.call(attributes).forEach(attr => {
+                let name = attr.name;
+                if (that.isDirective(name)) {
+                    let value = attr.value,
+                        dir = name.substring(2);
+                    // 事件
+                    if (dir === 'on' || name === '@') {
+                        compilerUtil.eventHandler(node, value, that.$vm, dir)
+                    } else {
+                        compilerUtil[dir] && compilerUtil[dir](node, value, that.$vm)
+                    }
+                    node.removeAttribute(name)
+                }
+            });
+            if (this.isExpression(node.textContent)) {
+                this.compilerText(node, RegExp.$1.trim())
+            }
+        }
+
+        /**
+         *  编译元素 
+         * */
+        Compiler.prototype.compilerText = function (node, value) {
+            compilerUtil.text(node, value, this.$vm)
+        }
+
+        // 是元素 
+        Compiler.prototype.isElementNode = function (el) {
+            return el.nodeType === 1
+        }
+
+        // 是文本
+        Compiler.prototype.isTextNode = function (el) {
+            return el.nodeType === 3
+        }
+
+        // 是指令
+        Compiler.prototype.isDirective = function (str) {
+            return str.includes('v-') || str.includes('@')
+        }
+
+        // 是文本表达式
+        Compiler.prototype.isExpression = function (str) {
+            let reg = /\{\{(.*)\}\}/
+            return reg.test(str)
+        }
+
+        // ----------------------------------compilerUtil----------------------------------
+        let compilerUtil = {
+            html: function (node, value, vm) {
+                this.update(node, value, vm, 'html')
+            },
+            text: function (node, value, vm) {
+                this.update(node, value, vm, 'text')
+            },
+            model: function (node, value, vm) {
+                node.addEventListener('input', e => {
+                    let target = e.target,
+                        val = target.value;
+                    vm[value] = val
+                })
+                this.update(node, value, vm, 'model')
+            },
+            bind: function () {
+
+            },
+            eventHandler: function (node, value, vm, dir) {
+
+            },
+            update: function (node, value, vm, type) {
+                // 更新视图
+                let updateFn = update[type]
+                updateFn && updateFn(node, vm[value])
+
+                // 放入订阅者进行监听
+                new Watcher(vm, value, function () {
+                    updateFn && updateFn(node, vm[value])
+                })
+
+            }
+        }
+
+
+        // ------------------------------------directiveUpdate------------------------------------------
+        let update = {
+            text: function (node, value) {
+                node.textContent = typeof node === 'undefined' ? '' : value
+            },
+            html: function (node, value) {
+                node.innerHTML = typeof node === 'undefined' ? '' : value
+            },
+            class: function () {
+
+            },
+            model: function (node, value) {
+                node.value = typeof node === 'undefined' ? '' : value
+            }
+        }
+
+        let data = {
+            text: '你好啊 tex奥术大师多奥术大师大声道阿萨德奥德赛t',
+            num: 50,
+            html: "<p>啊哈哈哈哈哈哈哈</p>",
+            email: '哈哈哈'
+        }
+        let vm = {
+            data: {
+                text: '你好啊 tex奥术大师多奥术大师大声道阿萨德奥德赛t',
+                num: 50,
+                html: "<p>啊哈哈哈哈哈哈哈</p>",
+                email: '哈哈哈'
+            },
+            methods: {
+
+            }
+        }
+        Observer(data)
+        new Compiler('#root', data)
+
+
+
+    </script>
+</body>
+
+</html>

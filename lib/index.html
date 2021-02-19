@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+
+    <div id="root">
+        <div>{{first}}</div>
+        <p v-text="secondText"></p>
+        <p v-html="thirdHtml"></p>
+        <input type="text" v-model="threeModel">
+        <p>{{threeModel}}</p>
+        <button v-on:click="showAlert">alert</button>
+        {{threeModel}}
+    </div>
+
+    <script src="./js/observer.js"></script>
+    <script src="./js/compiler.js"></script>
+    <script src="./js/watcher.js"></script>
+    <script src="./js/mvvm.js"></script>
+
+    <script>
+
+        new Mvvm({
+            el: '#root',
+            data: {
+                first: 'first',
+                secondText: 'secondText',
+                thirdHtml: 'thirdHtml',
+                threeModel: 'threeModel',
+            },
+            methods: {
+                showAlert() {
+                    console.log(this.first)
+                    this.first = 'modify first'
+                    this.threeModel = '哈哈哈哈，数据代理，数据劫持'
+                }
+            }
+        })
+
+
+        // let testA = {
+        // };
+        // let testB = {
+        //     a: 1,
+        //     b: 2,
+        //     c: 3
+        // }
+
+        // for (let key in testB) {
+        //     Object.defineProperty(testA, key, {
+        //         enumerable: true,
+        //         configurable: false,
+        //         get: function () {
+        //             return testB[key]
+        //         },
+        //         set: function (newVal) {
+        //             debugger
+        //             testB[key] = newVal
+        //         }
+        //     })
+        // }
+
+
+
+
+    </script>
+</body>
+
+</html>

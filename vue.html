@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+
+    <script>
+
+        function Dep() {
+            this.subs = []
+        }
+
+        Dep.prototype.addSub = function (callback) {
+            this.subs.push(callback)
+        }
+
+        Dep.prototype.notify = function () {
+            this.subs.forEach(fn => fn())
+        }
+
+        // 数据劫持
+        function Observer(data) {
+            if (!data || typeof data !== 'object') {
+                return {}
+            }
+
+            Object.keys(data).forEach(key => defineReactive(data, key, data[key]))
+        }
+
+        function defineReactive(data, key, value) {
+            let dep = new Dep()
+            Object.defineProperty(data, key, {
+                get: function () {
+                    console.log('你想获取他？')
+                    Dep.target && dep.addSub(Dep.target)
+                    return value
+                },
+                set: function (newVal) {
+                    console.log('我监听到你变化了')
+                    if (newVal === value) {
+                        return
+                    }
+                    value = newVal
+                    dep.notify()
+                }
+            })
+        }
+
+        let data = {
+            a: 2,
+            b: 3
+        }
+
+        Observer(data)
+
+    </script>
+
+</body>
+
+</html>
